@@ -36,7 +36,7 @@ jobs:
         source: armorcore/Deployment/ArmorPaint
         # Target file
         target: build/krom/ArmorPaint
-    - name: Copy file
+    - name: Create artifac
       uses: actions/upload-artifact@v2
       with:
         name: ArmorPaint.zip
