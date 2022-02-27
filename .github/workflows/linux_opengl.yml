@@ -21,3 +21,19 @@ jobs:
       run: git clone https://github.com/armory3d/nodejs_bin.git --depth 1
     - name: Compile
       run: nodejs_bin/node-linux64 armorcore/make -g opengl
+    - name: Compile clang opengl
+      run: cd armorcore && node Kinc/make.js -g opengl --compiler clang --compile
+    - name: Strip
+      run: cd armorcore/Deployment && strip ArmorPaint
+    - name: Copy file
+      uses: canastro/copy-action@0.0.2
+      with:
+        # Source file
+        source: armorcore/Deployment/ArmorPaint
+        # Target file
+        target: build/krom/ArmorPaint
+    - name: Create artifac
+      uses: actions/upload-artifact@v2
+      with:
+        name: ArmorPaint.zip
+        path: build/krom
