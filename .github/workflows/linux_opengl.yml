@@ -37,5 +37,5 @@ jobs:
     - name: Create artifac
       uses: actions/upload-artifact@v2
       with:
-        name: ArmorPaint.zip
+        name: ArmorPaint
         path: build/krom
