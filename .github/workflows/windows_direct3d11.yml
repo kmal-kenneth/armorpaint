@@ -25,4 +25,7 @@ jobs:
       uses: edgarrc/action-7z@v1
       with:
         args: 7z e armorcore/v8\libraries\win32\release\v8_monolith.7z
+    - name: Kinc
+      run: git apply patch/window_handling.diff --directory=Kinc
+
 
