@@ -25,7 +25,7 @@ jobs:
       uses: edgarrc/action-7z@v1
       with:
         args: 7z e armorcore/v8\libraries\win32\release\v8_monolith.7z
-    - name: Kinc
-      run: git apply patch/window_handling.diff --directory=Kinc
-
-
+    - name: patch Kinc
+      run: cd armorcore; git apply patch/window_handling.diff --directory=Kinc
+    - name: kinc
+      run: cd armorcore; node Kinc/make.js -g direct3d11
