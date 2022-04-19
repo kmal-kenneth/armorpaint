@@ -17,6 +17,7 @@ import arm.util.RenderUtil;
 import arm.ui.UIHeader;
 import arm.Enums;
 import arm.Project;
+import arm.ProjectFormat.TSwatchColor;
 
 @:access(zui.Zui)
 @:access(zui.Nodes)
@@ -69,7 +70,7 @@ class UINodes {
 		Nodes.onCanvasControl = onCanvasControl;
 
 		var scale = Config.raw.window_scale;
-		ui = new Zui({theme: App.theme, font: App.font, color_wheel: App.colorWheel, scaleFactor: scale});
+		ui = new Zui({ theme: App.theme, font: App.font, color_wheel: App.colorWheel, black_white_gradient: App.blackWhiteGradient, scaleFactor: scale });
 		ui.scrollEnabled = false;
 	}
 
@@ -92,7 +93,16 @@ class UINodes {
 					var n = nodes.nodesSelected[0];
 					if (linkDrag.to_id == -1 && n.inputs.length > 0) {
 						linkDrag.to_id = n.id;
+						var fromType = node.outputs[linkDrag.from_socket].type;
+						// 1. step: Connect to the first socket.
 						linkDrag.to_socket = 0;
+						// 2. step: Try to find the first type-matching socket and use it if present.
+						for (socket in n.inputs) {
+							if (socket.type == fromType) {
+								linkDrag.to_socket = n.inputs.indexOf(socket);
+								break;
+							}
+						}
 						getCanvas(true).links.push(linkDrag);
 					}
 					else if (linkDrag.from_id == -1 && n.outputs.length > 0) {
@@ -681,6 +691,19 @@ class UINodes {
 				Zui.isCopy = Zui.isCut = Zui.isPaste = ui.isDeleteDown = false;
 			}
 
+			if (nodes.colorPickerCallback != null) {
+				Context.colorPickerPreviousTool = Context.tool;
+				Context.selectTool(ToolPicker);
+				var tmp = nodes.colorPickerCallback;
+				Context.colorPickerCallback = function(color: TSwatchColor) {
+					tmp(color.base);
+					UINodes.inst.hwnd.redraws = 2;
+					if (Config.raw.material_live)
+						UINodes.inst.canvasChanged();
+				};
+				nodes.colorPickerCallback = null;
+			}
+
 			// Remove nodes with unknown id for this canvas type
 			if (Zui.isPaste) {
 				var nodeList = canvasType == CanvasMaterial ? NodesMaterial.list : NodesBrush.list;
@@ -1003,12 +1026,11 @@ class UINodes {
 		getNodes().nodesSelected = [n];
 	}
 
-	public function acceptSwatchDrag(index: Int) {
+	public function acceptSwatchDrag(swatch: TSwatchColor) {
 		pushUndo();
 		var g = groupStack.length > 0 ? groupStack[groupStack.length - 1] : null;
 		var n = NodesMaterial.createNode("RGB", g);
-		var color = Project.raw.swatches[index].base;
-		n.outputs[0].default_value = [color.R, color.G, color.B, color.A];
+		n.outputs[0].default_value = [swatch.base.R, swatch.base.G, swatch.base.B, swatch.base.A];
 		getNodes().nodesSelected = [n];
 	}
 

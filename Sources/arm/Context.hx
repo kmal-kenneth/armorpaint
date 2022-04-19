@@ -65,6 +65,8 @@ class Context {
 
 	public static var swatch: TSwatchColor;
 	public static var pickedColor: TSwatchColor = Project.makeSwatch();
+	public static var colorPickerCallback: TSwatchColor->Void = null;
+	public static var colorPickerPreviousTool = ToolBrush;
 	public static var materialIdPicked = 0;
 	public static var uvxPicked = 0.0;
 	public static var uvyPicked = 0.0;
@@ -86,14 +88,15 @@ class Context {
 	public static var previewEnvmap: Image = null;
 	public static var envmapLoaded = false;
 	public static var showEnvmap = false;
-	public static var showEnvmapHandle = new Handle({selected: false});
+	public static var showEnvmapHandle = new Handle({ selected: false });
 	public static var showEnvmapBlur = false;
-	public static var showEnvmapBlurHandle = new Handle({selected: false});
+	public static var showEnvmapBlurHandle = new Handle({ selected: false });
 	public static var envmapAngle = 0.0;
+	public static var lightAngle = 0.0;
 	public static var drawWireframe = false;
-	public static var wireframeHandle = new Handle({selected: false});
+	public static var wireframeHandle = new Handle({ selected: false });
 	public static var drawTexels = false;
-	public static var texelsHandle = new Handle({selected: false});
+	public static var texelsHandle = new Handle({ selected: false });
 	public static var cullBackfaces = true;
 	public static var textureFilter = true;
 
@@ -140,6 +143,11 @@ class Context {
 	public static var particleHitX = 0.0;
 	public static var particleHitY = 0.0;
 	public static var particleHitZ = 0.0;
+	public static var lastParticleHitX = 0.0;
+	public static var lastParticleHitY = 0.0;
+	public static var lastParticleHitZ = 0.0;
+	public static var particleTimer: iron.system.Tween.TAnim = null;
+	public static var paintBody: arm.plugin.PhysicsBody = null;
 	#end
 
 	public static var layerFilter = 0;
@@ -198,17 +206,17 @@ class Context {
 	public static var brushDirectional = false;
 
 	public static var brushRadius = 0.5;
-	public static var brushRadiusHandle = new Handle({value: 0.5});
+	public static var brushRadiusHandle = new Handle({ value: 0.5 });
 	public static var brushDecalMaskRadius = 0.5;
-	public static var brushDecalMaskRadiusHandle = new Handle({value: 0.5});
+	public static var brushDecalMaskRadiusHandle = new Handle({ value: 0.5 });
 	public static var brushScaleX = 1.0;
-	public static var brushScaleXHandle = new Handle({value: 1.0});
+	public static var brushScaleXHandle = new Handle({ value: 1.0 });
 	public static var brushBlending = BlendMix;
 	public static var brushOpacity = 1.0;
-	public static var brushOpacityHandle = new Handle({value: 1.0});
+	public static var brushOpacityHandle = new Handle({ value: 1.0 });
 	public static var brushScale = 1.0;
 	public static var brushAngle = 0.0;
-	public static var brushAngleHandle = new Handle({value: 0.0});
+	public static var brushAngleHandle = new Handle({ value: 0.0 });
 	public static var brushHardness = 0.8;
 	public static var brushLazyRadius = 0.0;
 	public static var brushLazyStep = 0.0;
@@ -278,6 +286,28 @@ class Context {
 	public static function selectMaterial(i: Int) {
 		if (Project.materials.length <= i) return;
 		setMaterial(Project.materials[i]);
+	}
+
+	public static function setViewportMode(mode : ViewportMode) {
+		if (mode == viewportMode) return;
+
+		viewportMode = mode;
+		var deferred = Context.renderMode != RenderForward && (Context.viewportMode == ViewLit || Context.viewportMode == ViewPathTrace);
+		if (deferred) {
+			RenderPath.active.commands = RenderPathDeferred.commands;
+		}
+		// else if (Context.viewportMode == ViewPathTrace) {
+		// }
+		else {
+			if (RenderPathForward.path == null) {
+				RenderPathForward.init(RenderPath.active);
+			}
+			RenderPath.active.commands = RenderPathForward.commands;
+		}
+		var _workspace = UIHeader.inst.worktab.position;
+		UIHeader.inst.worktab.position = SpacePaint;
+		MakeMaterial.parseMeshMaterial();
+		UIHeader.inst.worktab.position = _workspace;
 	}
 
 	public static function setMaterial(m: MaterialSlot) {

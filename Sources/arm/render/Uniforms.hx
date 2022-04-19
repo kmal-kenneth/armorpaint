@@ -159,7 +159,7 @@ class Uniforms {
 				if (Config.raw.pressure_angle && pen.down()) {
 					angle *= pen.pressure * Config.raw.pressure_sensitivity;
 				}
-				vec.set(Math.cos(angle), Math.sin(angle), 0);
+				vec.set(Math.cos(-angle), Math.sin(-angle), 0);
 				return vec;
 			}
 			case "_texpaintSize": {
@@ -218,6 +218,11 @@ class Uniforms {
 			case "_particleHit": {
 				v = iron.object.Uniforms.helpVec;
 				v.set(Context.particleHitX, Context.particleHitY, Context.particleHitZ);
+				return v;
+			}
+			case "_particleHitLast": {
+				v = iron.object.Uniforms.helpVec;
+				v.set(Context.lastParticleHitX, Context.lastParticleHitY, Context.lastParticleHitZ);
 				return v;
 			}
 			#end

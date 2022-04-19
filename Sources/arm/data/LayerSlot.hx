@@ -107,16 +107,26 @@ class LayerSlot {
 
 	public function delete() {
 		unload();
-		var masks = getMasks();
-		if (masks != null) for (m in masks) m.delete();
-		var children = getChildren();
-		if (children != null) for (c in children) c.parent = null;
+
+		if (isLayer()) {
+			var masks = getMasks(false); // Prevents deleting group masks
+			if (masks != null) for (m in masks) m.delete();
+		}
+		else if(isGroup()) {
+			var children = getChildren();
+			if (children != null) for (c in children) c.delete();
+			var masks = getMasks();
+			if (masks != null) for (m in masks) m.delete();
+		}
+
 		var lpos = Project.layers.indexOf(this);
 		Project.layers.remove(this);
 		// Undo can remove base layer and then restore it from undo layers
 		if (Project.layers.length > 0) {
 			Context.setLayer(Project.layers[lpos > 0 ? lpos - 1 : 0]);
 		}
+
+		// Do not remove empty groups if the last layer is deleted as this prevents redo from working properly
 	}
 
 	public function unload() {
@@ -142,6 +152,7 @@ class LayerSlot {
 	}
 
 	public function swap(other: LayerSlot) {
+		if ((isLayer() || isMask()) && (other.isLayer() || other.isMask())) {
 		RenderPath.active.renderTargets.get("texpaint" + ext).image = other.texpaint;
 		RenderPath.active.renderTargets.get("texpaint" + other.ext).image = texpaint;
 		var _texpaint = texpaint;
@@ -150,6 +161,7 @@ class LayerSlot {
 		var _texpaint_preview = texpaint_preview;
 		texpaint_preview = other.texpaint_preview;
 		other.texpaint_preview = _texpaint_preview;
+		}
 
 		if (isLayer() && other.isLayer()) {
 			RenderPath.active.renderTargets.get("texpaint_nor" + ext).image = other.texpaint_nor;
@@ -165,7 +177,7 @@ class LayerSlot {
 		}
 	}
 
-	public function clear(baseColor = 0x00000000, baseImage: kha.Image = null) {
+	public function clear(baseColor = 0x00000000, baseImage: kha.Image = null, occlusion = 1.0, roughness = Layers.defaultRough, metallic = 0.0) {
 		texpaint.g4.begin();
 		texpaint.g4.clear(baseColor); // Base
 		texpaint.g4.end();
@@ -180,7 +192,7 @@ class LayerSlot {
 			texpaint_nor.g4.clear(kha.Color.fromFloats(0.5, 0.5, 1.0, 0.0)); // Nor
 			texpaint_nor.g4.end();
 			texpaint_pack.g4.begin();
-			texpaint_pack.g4.clear(kha.Color.fromFloats(1.0, Layers.defaultRough, 0.0, 0.0)); // Occ, rough, met
+			texpaint_pack.g4.clear(kha.Color.fromFloats(occlusion, roughness, metallic, 0.0)); // Occ, rough, met
 			texpaint_pack.g4.end();
 		}
 
@@ -380,6 +392,21 @@ class LayerSlot {
 		return children;
 	}
 
+	public function getRecursiveChildren(): Array<LayerSlot> {
+		var children: Array<LayerSlot> = null;
+		for (l in Project.layers) {
+			if (l.parent == this) { // Child layers and group masks
+				if (children == null) children = [];
+				children.push(l);
+			}
+			if (l.parent != null && l.parent.parent == this) { // Layer masks
+				if (children == null) children = [];
+				children.push(l);
+			}
+		}
+		return children;
+	}
+
 	public function getMasks(includeGroupMasks = true): Array<LayerSlot> {
 		if (this.isMask()) return null;
 
@@ -405,7 +432,7 @@ class LayerSlot {
 		return children;
 	}
 
-	public function hasMasks(): Bool {
+	public function hasMasks(includeGroupMasks = true): Bool {
 		// Layer mask
 		for (l in Project.layers) {
 			if (l.parent == this && l.isMask()) {
@@ -413,7 +440,7 @@ class LayerSlot {
 			}
 		}
 		// Group mask
-		if (this.parent != null && this.parent.isGroup()) {
+		if (includeGroupMasks && this.parent != null && this.parent.isGroup()) {
 			for (l in Project.layers) {
 				if (l.parent == this.parent && l.isMask()) {
 					return true;
@@ -441,53 +468,80 @@ class LayerSlot {
 		return texpaint == null;
 	}
 
+	public function getContainingGroup(): LayerSlot {
+		if (parent != null && parent.isGroup())
+			return parent;
+		else if (parent != null && parent.parent != null && parent.parent.isGroup())
+			return parent.parent;
+		else return null;
+	}
+
 	public function isMask(): Bool {
 		return texpaint != null && texpaint_nor == null;
 	}
 
+	public function isGroupMask(): Bool {
+		return texpaint != null && texpaint_nor == null && parent.isGroup();
+	}
+
+	public function isLayerMask(): Bool {
+		return texpaint != null && texpaint_nor == null && parent.isLayer();
+	}
+
+	public function isInGroup(): Bool {
+		return parent != null && (parent.isGroup() || (parent.parent != null && parent.parent.isGroup()));
+	}
+
 	public function canMove(to: Int): Bool {
-		var i = Project.layers.indexOf(this);
-		var delta = to - i;
-		if (i + delta < 0 || i + delta > Project.layers.length - 1 || delta == 0) return false;
+		var oldIndex = Project.layers.indexOf(this);
 
-		var isGroup = this.isGroup();
-		var isMask = this.isMask();
-		var isLayer = this.isLayer();
-		var j = delta > 0 ? to : (to == 0 ? 0 : to - 1); // One element down
-		var k = delta > 0 ? to + 1 : to; // One element up
-		var jParent = j >= 0 ? Project.layers[j].parent : null;
-		var kIsGroup = k < Project.layers.length ? Project.layers[k].isGroup() : false;
-		var kIsMask = k < Project.layers.length ? Project.layers[k].isMask() : false;
-		var jIsMask = j < Project.layers.length ? Project.layers[j].isMask() : false;
+		var delta = to - oldIndex; // If delta > 0 the layer is moved up, otherwise down
+		if (to < 0 || to > Project.layers.length - 1 || delta == 0) return false;
 
-		// Prevent group nesting for now
-		if (isGroup && jParent != null && jParent.show_panel) {
-			return false;
+		// If the layer is moved up, all layers between the old position and the new one move one down.
+		// The layers above the new position stay where they are.
+		// If the new position is on top or on bottom no upper resp. lower layer exists.
+		var newUpperLayer = delta > 0 ? (to < Project.layers.length - 1 ? Project.layers[to + 1] : null) : Project.layers[to];
+
+		// Group or layer is collapsed so we check below and update the upper layer.
+		if (newUpperLayer != null && !newUpperLayer.show_panel) {
+			var children = newUpperLayer.getRecursiveChildren();
+			to -= children != null ? children.length : 0;
+			delta = to - oldIndex;
+			newUpperLayer = delta > 0 ? (to < Project.layers.length - 1 ? Project.layers[to + 1] : null) : Project.layers[to];
 		}
 
-		// Prevent moving mask to group
-		if (isMask && kIsGroup) {
-			return false;
+		var newLowerLayer = delta > 0 ? Project.layers[to] : (to > 0 ? Project.layers[to - 1] : null);
+
+		if (this.isMask()) {
+			// Masks can not be on top.
+			if (newUpperLayer == null) return false;
+			// Masks should not be placed below a collapsed group. This condition can be savely removed.
+			if (newUpperLayer.isInGroup() && !newUpperLayer.getContainingGroup().show_panel) return false;
+			// Masks should not be placed below a collapsed layer. This condition can be savely removed.
+			if (newUpperLayer.isMask() && !newUpperLayer.parent.show_panel) return false;
 		}
 
-		// Prevent moving mask to top
-		if (isMask && i + delta == Project.layers.length - 1) {
-			return false;
+		if (this.isLayer()) {
+			// Layers can not be moved directly below its own mask(s).
+			if (newUpperLayer != null && newUpperLayer.isMask() && newUpperLayer.parent == this) return false;
+			// Layers can not be placed above a mask as the mask would be reparented.
+			if (newLowerLayer != null && newLowerLayer.isMask()) return false;
 		}
 
-		// Prevent moving group to mask
-		if (isGroup && kIsMask) {
-			return false;
-		}
-
-		// Prevent moving layer to mask
-		if (isLayer && kIsMask) {
-			return false;
-		}
-
-		// Prevent moving layer between layer and mask
-		if (isLayer && jIsMask) {
-			return false;
+		// Currently groups can not be nested. Thus valid positions for groups are:
+		if (this.isGroup()) {
+			// At the top.
+			if (newUpperLayer == null) return true;
+			// NOT below its own children.
+			if (newUpperLayer.getContainingGroup() == this) return false;
+			// At the bottom.
+			if (newLowerLayer == null) return true;
+			// Above a group.
+			if (newLowerLayer.isGroup()) return true;
+			// Above a non-grouped layer.
+			if (newLowerLayer.isLayer() && !newLowerLayer.isInGroup()) return true;
+			else return false;
 		}
 
 		return true;
@@ -498,92 +552,74 @@ class LayerSlot {
 			return;
 		}
 
-		var i = Project.layers.indexOf(this);
-		var delta = to - i;
-
 		var pointers = TabLayers.initLayerMap();
-		var isGroup = this.isGroup();
-		var isMask = this.isMask();
-		var j = delta > 0 ? to : (to == 0 ? 0 : to - 1); // One element down
-		var k = delta > 0 ? to + 1 : to; // One element up
-		var jParent = j >= 0 ? Project.layers[j].parent : null;
-		var kParent = k < Project.layers.length ? Project.layers[k].parent : null;
-		var kIsGroup = k < Project.layers.length ? Project.layers[k].isGroup() : false;
-		var kIsMask = k < Project.layers.length ? Project.layers[k].isMask() : false;
-		var kIsLayer = k < Project.layers.length ? Project.layers[k].isLayer() : false;
-		var kLayer = k < Project.layers.length ? Project.layers[k] : null;
+		var oldIndex = Project.layers.indexOf(this);
+		var delta = to - oldIndex;
+		var newUpperLayer = delta > 0 ? (to < Project.layers.length - 1 ? Project.layers[to + 1] : null) : Project.layers[to];
 
-		if (kIsGroup && !kLayer.show_panel) {
-			delta -= kLayer.getChildren().length;
-		}
-
-		if (kIsLayer && kLayer.getMasks() != null && !kLayer.show_panel) {
-			delta -= kLayer.getMasks().length;
+		// Group or layer is collapsed so we check below and update the upper layer.
+		if (newUpperLayer != null && !newUpperLayer.show_panel) {
+			var children = newUpperLayer.getRecursiveChildren();
+			to -= children != null ? children.length : 0;
+			delta = to - oldIndex;
+			newUpperLayer = delta > 0 ? (to < Project.layers.length - 1 ? Project.layers[to + 1] : null) : Project.layers[to];
 		}
 
 		Context.setLayer(this);
-		History.orderLayers(i + delta);
+		History.orderLayers(to);
 		UISidebar.inst.hwnd0.redraws = 2;
 
 		Project.layers.remove(this);
-		Project.layers.insert(i + delta, this);
+		Project.layers.insert(to, this);
 
-		if (isGroup) {
-			var children = this.getChildren();
-			for (l in 0...children.length) {
-				var c = children[delta > 0 ? l : children.length - 1 - l];
-				Project.layers.remove(c);
-				Project.layers.insert(delta > 0 ? i + delta - 1 : i + delta, c);
+		if (this.isLayer()) {
+			var oldParent = this.parent;
 
-				var lmasks = c.getMasks();
-				if (lmasks != null) {
-					for (m in 0...lmasks.length) {
-						var mc = lmasks[delta > 0 ? m : lmasks.length - 1 - m];
-						Project.layers.remove(mc);
-						Project.layers.insert(delta > 0 ? i + delta - 2 : i + delta, mc);
-					}
-				}
-			}
-		}
-		else if (isMask) {
-			// Moved to different layer
-			if (kIsMask && kParent != this.parent) {
-				this.parent = kParent;
-			}
-			if (kIsLayer && kLayer != this.parent) {
-				this.parent = kLayer;
-			}
-		}
-		else { // Layer
-			// Moved to group
-			if (this.parent == null && jParent != null && jParent.show_panel) {
-				this.parent = jParent;
-			}
+			if (newUpperLayer == null)
+				this.parent = null; // Placed on top.
+			else if (newUpperLayer.isInGroup() && !newUpperLayer.getContainingGroup().show_panel)
+				this.parent = null; // Placed below a collapsed group.
+			else if (newUpperLayer.isLayer())
+				this.parent = newUpperLayer.parent; // Placed below a layer, use the same parent.
+			else if (newUpperLayer.isGroup()) 
+				this.parent = newUpperLayer; // Placed as top layer in a group.
+			else if (newUpperLayer.isGroupMask())
+				this.parent = newUpperLayer.parent; // Placed in a group below the lowest group mask.
+			else if (newUpperLayer.isLayerMask())
+				this.parent = newUpperLayer.getContainingGroup(); // Either the group the mask belongs to or null.
 
-			var oldParent = null;
-			// Moved out of group
-			if (this.parent != null && kParent == null && !kIsGroup) {
-				oldParent = this.parent;
-				this.parent = null;
-			}
-			// Moved to different group
-			if (this.parent != null && ((kParent != null && kParent.show_panel) || kIsGroup)) {
-				oldParent = this.parent;
-				this.parent = kIsGroup ? kLayer : kParent;
-			}
-
-			var lmasks = this.getMasks();
-			if (lmasks != null) {
-				for (m in 0...lmasks.length) {
-					var mc = lmasks[delta > 0 ? m : lmasks.length - 1 - m];
-					Project.layers.remove(mc);
-					Project.layers.insert(delta > 0 ? i + delta - 1 : i + delta, mc);
+			// Layers can have masks as children. These have to be moved, too.
+			var layerMasks = this.getMasks(false);
+			if (layerMasks != null) {
+				for (idx in 0...layerMasks.length) {
+					var mask = layerMasks[idx];
+					Project.layers.remove(mask);
+					// If the masks are moved down each step increases the index below the layer by one.
+					Project.layers.insert(delta > 0 ? oldIndex + delta - 1 : oldIndex + delta + idx, mask);
 				}
 			}
 
-			// Remove empty group
-			if (oldParent != null && oldParent.getChildren() == null) {
+			// The layer is the last layer in the group, remove it. Notice that this might remove group masks.
+			if (oldParent != null && oldParent.getChildren() == null)
 				oldParent.delete();
+		}
+		else if (this.isMask()) {
+			// Precondition newUpperLayer != null, ensured in canMove.
+			if (newUpperLayer.isLayer() || newUpperLayer.isGroup())
+				this.parent = newUpperLayer;
+			else if (newUpperLayer.isMask()) { // Group mask or layer mask.
+				this.parent = newUpperLayer.parent;
+			}	
+		}
+		else if (this.isGroup()) {
+			var children = this.getRecursiveChildren();
+			if (children != null) {
+				for (idx in 0...children.length) {
+					var child = children[idx];
+					Project.layers.remove(child);
+					// If the children are moved down each step increases the index below the layer by one.
+					Project.layers.insert(delta > 0 ? oldIndex + delta - 1 : oldIndex + delta + idx, child);
+				}
 			}
 		}
 
