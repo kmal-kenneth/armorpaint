@@ -23,10 +23,8 @@ jobs:
       run: sudo apt install -y make clang libxinerama-dev libxrandr-dev libasound2-dev libxi-dev mesa-common-dev libgl-dev libxcursor-dev libvulkan-dev libgtk-3-dev libudev-dev
     - name: Get Submodules
       run: git submodule update --init --recursive
-    - name: Get Node.js
-      run: git clone https://github.com/armory3d/nodejs_bin.git --depth 1
     - name: Compile
-      run: nodejs_bin/node-linux64 armorcore/make -g opengl
+      run: armorcore/Kinc/make --from armorcore -g opengl --compiler clang --compile
     - name: Strip
       run: cd armorcore/Deployment && strip ArmorPaint
     - name: Copy file
