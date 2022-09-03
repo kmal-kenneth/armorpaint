@@ -112,7 +112,7 @@ class LayerSlot {
 			var masks = getMasks(false); // Prevents deleting group masks
 			if (masks != null) for (m in masks) m.delete();
 		}
-		else if(isGroup()) {
+		else if (isGroup()) {
 			var children = getChildren();
 			if (children != null) for (c in children) c.delete();
 			var masks = getMasks();
@@ -153,14 +153,14 @@ class LayerSlot {
 
 	public function swap(other: LayerSlot) {
 		if ((isLayer() || isMask()) && (other.isLayer() || other.isMask())) {
-		RenderPath.active.renderTargets.get("texpaint" + ext).image = other.texpaint;
-		RenderPath.active.renderTargets.get("texpaint" + other.ext).image = texpaint;
-		var _texpaint = texpaint;
-		texpaint = other.texpaint;
-		other.texpaint = _texpaint;
-		var _texpaint_preview = texpaint_preview;
-		texpaint_preview = other.texpaint_preview;
-		other.texpaint_preview = _texpaint_preview;
+			RenderPath.active.renderTargets.get("texpaint" + ext).image = other.texpaint;
+			RenderPath.active.renderTargets.get("texpaint" + other.ext).image = texpaint;
+			var _texpaint = texpaint;
+			texpaint = other.texpaint;
+			other.texpaint = _texpaint;
+			var _texpaint_preview = texpaint_preview;
+			texpaint_preview = other.texpaint_preview;
+			other.texpaint_preview = _texpaint_preview;
 		}
 
 		if (isLayer() && other.isLayer()) {
@@ -277,13 +277,17 @@ class LayerSlot {
 		l.objectMask = objectMask;
 		l.blending = blending;
 		l.uvType = uvType;
+		l.scale = scale;
+		l.angle = angle;
 		l.paintBase = paintBase;
 		l.paintOpac = paintOpac;
 		l.paintOcc = paintOcc;
 		l.paintRough = paintRough;
 		l.paintMet = paintMet;
 		l.paintNor = paintNor;
+		l.paintNorBlend = paintNorBlend;
 		l.paintHeight = paintHeight;
+		l.paintHeightBlend = paintHeightBlend;
 		l.paintEmis = paintEmis;
 		l.paintSubs = paintSubs;
 

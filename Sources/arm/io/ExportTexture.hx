@@ -90,9 +90,9 @@ class ExportTexture {
 		#end
 
 		#if krom_ios
-		Console.info(tr("Textures exported.") + " ('Files/On My iPad/" + Main.title + "')");
+		Console.info(tr("Textures exported") + " ('Files/On My iPad/" + Main.title + "')");
 		#else
-		Console.info(tr("Textures exported."));
+		Console.info(tr("Textures exported"));
 		#end
 		@:privateAccess UIFiles.lastPath = "";
 	}
@@ -327,8 +327,8 @@ class ExportTexture {
 					else if (c == "opac") copyChannel(pixpaint, 3, pix, i, t.color_space == "linear");
 					else if (c == "rough") copyChannel(pixpaint_pack, 1, pix, i, t.color_space == "linear");
 					else if (c == "smooth") copyChannelInv(pixpaint_pack, 1, pix, i, t.color_space == "linear");
-					else if (c == "emis") extractChannel(pixpaint_nor, 3, pix, i, 255, t.color_space == "linear");
-					else if (c == "subs") extractChannel(pixpaint_nor, 3, pix, i, 254, t.color_space == "linear");
+					else if (c == "emis") extractChannel(pixpaint_nor, 3, pix, i, 3, 1, t.color_space == "linear");
+					else if (c == "subs") extractChannel(pixpaint_nor, 3, pix, i, 3, 2, t.color_space == "linear");
 					else if (c == "0.0") setChannel(0, pix, i);
 					else if (c == "1.0") setChannel(255, pix, i);
 				}
@@ -391,9 +391,9 @@ class ExportTexture {
 		if (!linear) toSrgb(to, toChannel);
 	}
 
-	static function extractChannel(from: Bytes, fromChannel: Int, to: Bytes, toChannel: Int, mask: Int, linear = true) {
+	static function extractChannel(from: Bytes, fromChannel: Int, to: Bytes, toChannel: Int, step: Int, mask: Int, linear = true) {
 		for (i in 0...Std.int(to.length / 4)) {
-			to.set(i * 4 + toChannel, from.get(i * 4 + fromChannel) == mask ? 255 : 0);
+			to.set(i * 4 + toChannel, from.get(i * 4 + fromChannel) % step == mask ? 255 : 0);
 		}
 		if (!linear) toSrgb(to, toChannel);
 	}

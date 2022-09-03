@@ -457,7 +457,7 @@ class Layers {
 		Context.layerPreviewDirty = true;
 	}
 
-	public static function mergeGroup(l : LayerSlot) {
+	public static function mergeGroup(l: LayerSlot) {
 		if (!l.isGroup()) return null;
 
 		var children = l.getChildren();
@@ -977,4 +977,29 @@ class Layers {
 		iron.App.notifyOnInit(_init);
 	}
 
+	public static function onLayersResized() {
+		iron.App.notifyOnInit(function() {
+			Layers.resizeLayers();
+			var _layer = Context.layer;
+			var _material = Context.material;
+			for (l in arm.Project.layers) {
+				if (l.fill_layer != null) {
+					Context.layer = l;
+					Context.material = l.fill_layer;
+					Layers.updateFillLayer();
+				}
+			}
+			Context.layer = _layer;
+			Context.material = _material;
+			MakeMaterial.parsePaintMaterial();
+		});
+		UVUtil.uvmap = null;
+		UVUtil.uvmapCached = false;
+		UVUtil.trianglemap = null;
+		UVUtil.trianglemapCached = false;
+		UVUtil.dilatemapCached = false;
+		#if (kha_direct3d12 || kha_vulkan)
+		arm.render.RenderPathRaytrace.ready = false;
+		#end
+	}
 }

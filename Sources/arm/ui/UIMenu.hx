@@ -63,7 +63,7 @@ class UIMenu {
 				if (menuButton(ui, tr("Import Envmap..."))) {
 					UIFiles.show("hdr", false, false, function(path: String) {
 						if (!path.endsWith(".hdr")) {
-							Console.error("Error: .hdr file expected");
+							Console.error(tr("Error: .hdr file expected"));
 							return;
 						}
 						ImportAsset.run(path);
@@ -256,18 +256,22 @@ class UIMenu {
 					tr("Metallic"),
 					tr("Opacity"),
 					tr("Height"),
+					tr("Emission"),
+					tr("Subsurface"),
 					tr("TexCoord"),
 					tr("Object Normal"),
 					tr("Material ID"),
 					tr("Object ID"),
 					tr("Mask")
 				];
+				var shortcuts = ["l", "b", "n", "o", "r", "m", "a", "h", "e", "s", "t", "1", "2", "3", "4"];
 				#if (kha_direct3d12 || kha_vulkan)
 				modes.push(tr("Path Traced"));
+				shortcuts.push("p");
 				#end
 				for (i in 0...modes.length) {
 					menuFill(ui);
-					ui.radio(modeHandle, i, modes[i]);
+					ui.radio(modeHandle, i, modes[i], Config.keymap.viewport_mode + ", " + shortcuts[i]);
 				}
 
 				if (modeHandle.changed) Context.setViewportMode(modeHandle.position);

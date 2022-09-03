@@ -1,5 +1,6 @@
 package arm;
 
+import arm.Project.TNodeGroup;
 import zui.Nodes;
 import arm.ui.UISidebar;
 import arm.ui.UIView2D;
@@ -136,7 +137,7 @@ class History {
 				// Now restore the applied mask
 				undoI = undoI - 1 < 0 ? Config.raw.undo_steps - 1 : undoI - 1;
 				var mask = undoLayers[undoI];
-				Layers.newMask(false, currentLayer,maskPosition);
+				Layers.newMask(false, currentLayer, maskPosition);
 				Context.layer.swap(mask);
 				Context.layersPreviewDirty = true;
 				Context.setLayer(Context.layer);
@@ -184,6 +185,10 @@ class History {
 				MakeMaterial.parseMeshMaterial();
 			}
 			else if (step.name == tr("Edit Nodes")) {
+				swapCanvas(step);
+			}
+			else if (step.name == tr("Delete Node Group")) {
+				Project.materialGroups.insert(step.canvas_group, { canvas: null, nodes: new Nodes() });
 				swapCanvas(step);
 			}
 			else if (step.name == tr("New Material")) {
@@ -271,7 +276,7 @@ class History {
 					}
 					App.notifyOnNextFrame(function() {
 						for (i in 0...n) redo();
-						});
+					});
 				}
 			}
 			else if (step.name == tr("Clear Layer")) {
@@ -302,10 +307,10 @@ class History {
 					if (Context.layer.isGroupMask()) {
 						var group = Context.layer.parent;
 						var layers = group.getChildren();
-						layers.insert(0,Context.layer);
+						layers.insert(0, Context.layer);
 						copyMergingLayers2(layers);	
 					}
-					else copyMergingLayers2([Context.layer,Context.layer.parent]);
+					else copyMergingLayers2([Context.layer, Context.layer.parent]);
 
 				function _next() {
 					Context.layer.applyMask();
@@ -358,6 +363,10 @@ class History {
 			}
 			else if (step.name == tr("Edit Nodes")) {
 				swapCanvas(step);
+			}
+			else if (step.name == tr("Delete Node Group")) {
+				swapCanvas(step);
+				Project.materialGroups.remove(Project.materialGroups[step.canvas_group]);
 			}
 			else if (step.name == tr("New Material")) {
 				Context.material = new MaterialSlot(Project.materials[0].data);
@@ -456,6 +465,9 @@ class History {
 
 		var step = push(tr("Merge Layers"));
 		step.layer -= 1; // Merge down
+		if (Context.layer.hasMasks()) {
+			step.layer -= Context.layer.getMasks().length;
+		}
 		steps.shift(); // Merge consumes 2 steps
 		undos--;
 		// TODO: use undo layer in Layers.mergeDown to save memory
@@ -465,10 +477,10 @@ class History {
 		if (Context.layer.isGroupMask()) {
 			var group = Context.layer.parent;
 			var layers = group.getChildren();
-			layers.insert(0,Context.layer);
+			layers.insert(0, Context.layer);
 			copyMergingLayers2(layers);	
 		}
-		else copyMergingLayers2([Context.layer,Context.layer.parent]);
+		else copyMergingLayers2([Context.layer, Context.layer.parent]);
 		push(tr("Apply Mask"));
 	}
 
@@ -540,6 +552,13 @@ class History {
 		step.canvas = haxe.Json.parse(haxe.Json.stringify(canvas));
 	}
 
+	public static function deleteMaterialGroup(group: TNodeGroup) {
+		var step = push(tr("Delete Node Group"));
+		step.canvas_type = CanvasMaterial;
+		step.canvas_group = Project.materialGroups.indexOf(group);
+		step.canvas = haxe.Json.parse(haxe.Json.stringify(group.canvas));
+	}
+
 	static function push(name: String): TStep {
 		#if (krom_windows || krom_linux || krom_darwin)
 		var filename = Project.filepath == "" ? UIFiles.filename : Project.filepath.substring(Project.filepath.lastIndexOf(Path.sep) + 1, Project.filepath.length - 4);
@@ -587,7 +606,7 @@ class History {
 		copyToUndo(lay.id, undoI, Context.layer.isMask());
 	}
 
-	static function copyMergingLayers2(layers : Array<LayerSlot>) {
+	static function copyMergingLayers2(layers: Array<LayerSlot>) {
 		for (layer in layers)
 			copyToUndo(layer.id, undoI, layer.isMask());
 	}

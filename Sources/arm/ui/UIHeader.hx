@@ -97,7 +97,7 @@ class UIHeader {
 					App.dragOffY = -(mouse.y - uiy - ui._windowY + 1);
 					App.dragSwatch = Project.cloneSwatch(Context.pickedColor);
 				}
-				if (ui.isHovered) ui.tooltip(tr("Drag and drop picked color to swatches, materials, layers or to the node editor."));
+				if (ui.isHovered) ui.tooltip(tr("Drag and drop picked color to swatches, materials, layers or to the node editor"));
 				if (ui.isHovered && ui.inputReleased) {
 					UIMenu.draw(function(ui) {
 						ui.fill(0, 0, ui._w / ui.ops.scaleFactor, ui.t.ELEMENT_H * 9, ui.t.SEPARATOR_COL);
@@ -272,7 +272,7 @@ class UIHeader {
 				Context.brushOpacity = ui.slider(Context.brushOpacityHandle, tr("Opacity"), 0.0, 1.0, true);
 				if (ui.isHovered) ui.tooltip(tr("Hold {brush_opacity} and move mouse to the left to decrease the opacity\nHold {brush_opacity} and move mouse to the right to increase the opacity", ["brush_opacity" => Config.keymap.brush_opacity]));
 
-				if (Context.tool == ToolBrush || Context.tool == ToolEraser || decalMask) {
+				if (Context.tool == ToolBrush || Context.tool == ToolEraser || Context.tool == ToolClone || decalMask) {
 					Context.brushHardness = ui.slider(Id.handle({ value: Context.brushHardness }), tr("Hardness"), 0.0, 1.0, true);
 				}
 
@@ -313,7 +313,14 @@ class UIHeader {
 				if (Context.tool == ToolText) {
 					var h = Id.handle();
 					h.text = Context.textToolText;
-					Context.textToolText = ui.textInput(h, "");
+					var w = ui._w;
+					if (ui.textSelectedHandle == h || ui.submitTextHandle == h) {
+						ui._w *= 3;
+					}
+					
+					Context.textToolText = ui.textInput(h, "", Left, true, true);
+					ui._w = w;
+
 					if (h.changed) {
 						ui.g.end();
 						RenderUtil.makeTextPreview();

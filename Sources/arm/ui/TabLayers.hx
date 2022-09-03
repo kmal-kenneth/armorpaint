@@ -292,6 +292,19 @@ class TabLayers {
 
 			state = ui.image(icon, 0xffffffff, iconH);
 
+			var isTyping = ui.isTyping || UIView2D.inst.ui.isTyping || UINodes.inst.ui.isTyping;
+			if (!isTyping) {
+				if (i < 9 && Operator.shortcut(Config.keymap.select_layer, ShortcutDown)) {
+					var number = Std.string(i + 1) ;
+					var width = ui.ops.font.width(ui.fontSize, number) + 10;
+					var height = ui.ops.font.height(ui.fontSize);
+					ui.g.color = ui.t.TEXT_COL;
+					ui.g.fillRect(uix, uiy, width, height);
+					ui.g.color = ui.t.ACCENT_COL;
+					ui.g.drawString(number, uix + 5, uiy);
+				}
+			}
+
 			if (l.fill_layer == null && l.isMask()) {
 				ui.g.pipeline = null;
 			}
@@ -347,8 +360,8 @@ class TabLayers {
 			if (ui.textSelectedHandle != layerNameHandle) layerNameEdit = -1;
 		}
 		else {
-			if (ui.enabled && ui.inputEnabled &&
-				ui.inputX > ui._windowX + ui._x && ui.inputX < ui._windowX + ui._x + ui._w &&
+			if (ui.enabled && ui.inputEnabled && ui.comboSelectedHandle == null &&
+				ui.inputX > ui._windowX + ui._x && ui.inputX < ui._windowX + ui._windowW &&
 				ui.inputY > ui._windowY + ui._y - center && ui.inputY < ui._windowY + ui._y - center + (step * ui.SCALE()) * 2) {
 				if (ui.inputStarted) {
 					Context.setLayer(l);
@@ -652,15 +665,7 @@ class TabLayers {
 					UIMenu.keepOpen = true;
 				}
 				if (resHandleChangedLast && !App.resHandle.changed) {
-					iron.App.notifyOnInit(Layers.resizeLayers);
-					UVUtil.uvmap = null;
-					UVUtil.uvmapCached = false;
-					UVUtil.trianglemap = null;
-					UVUtil.trianglemapCached = false;
-					UVUtil.dilatemapCached = false;
-					#if (kha_direct3d12 || kha_vulkan)
-					arm.render.RenderPathRaytrace.ready = false;
-					#end
+					Layers.onLayersResized();
 				}
 				ui.text(tr("Res"));
 
@@ -835,7 +840,7 @@ class TabLayers {
 		// Remove empty group
 		if (l.isInGroup() && l.getContainingGroup().getChildren() == null) {
 			var g = l.getContainingGroup();
-			//Maybe some group masks are left
+			// Maybe some group masks are left
 			if (g.hasMasks()) {
 				for (m in g.getMasks()) {
 					Context.layer = m;
@@ -866,5 +871,4 @@ class TabLayers {
 		// Do not delete last layer
 		return numLayers > 1;
 	}
-
 }

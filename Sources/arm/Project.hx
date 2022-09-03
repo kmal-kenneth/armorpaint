@@ -96,7 +96,7 @@ class Project {
 					}
 					if (ui.isHovered) ui.tooltip(path);
 				}
-				if (ui.button("Clear", Left)) {
+				if (ui.button(tr("Clear"), Left)) {
 					Config.raw.recent_projects = [];
 					Config.save();
 				}
@@ -604,6 +604,20 @@ class Project {
 	public static function getMaterialGroupByName(groupName: String): TNodeGroup {
 		for (g in materialGroups) if (g.canvas.name == groupName) return g;
 		return null;
+	}
+
+	public static function isMaterialGroupInUse(group: TNodeGroup): Bool {
+		var canvases: Array<TNodeCanvas> = [];
+		for (m in materials) canvases.push(m.canvas);
+		for (m in materialGroups) canvases.push(m.canvas);
+		for (canvas in canvases) {
+			for (n in canvas.nodes) {
+				if (n.type == "GROUP" && n.name == group.canvas.name) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }
 
