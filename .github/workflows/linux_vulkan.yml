@@ -25,6 +25,8 @@ jobs:
       run: git submodule update --init --recursive
     - name: Clone krafix
       run: git clone --recursive https://github.com/armory3d/glsl_to_spirv armorcore/Libraries/glsl_to_spirv
+    - name: Get apply
+      run: git apply armorcore/patch/vulkan_raytrace.diff --directory=armorcore/Kinc
     - name: Compile
       run: armorcore/Kinc/make --from armorcore -g vulkan --compiler clang
     - name: Compile 2
